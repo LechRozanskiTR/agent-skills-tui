@@ -1,6 +1,6 @@
 import { Box, type Key, Text, useApp, useInput, useStdout } from "ink";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { filterTreeBySkillName } from "../domain/search.js";
 import {
@@ -213,7 +213,7 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
     return flattenVisibleTree(tree, visibleNodeIds, query.trim().length > 0);
   }, [tree, visibleNodeIds, query]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (visibleRows.length === 0) {
       setCursorIndex(0);
       return;
@@ -246,6 +246,24 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
     activeNode?.kind === "skill" && activeNode.skillMeta
       ? Object.entries(activeNode.skillMeta.frontmatter)
       : [];
+
+  const clearSearch = useCallback((): void => {
+    if (tree && activeRow) {
+      const unfilteredNodeIds = filterTreeBySkillName(tree, "");
+      const unfilteredRows = flattenVisibleTree(tree, unfilteredNodeIds, false);
+      const restoredIndex = unfilteredRows.findIndex((row) => row.id === activeRow.id);
+
+      pendingCursorNodeIdRef.current = null;
+      if (restoredIndex >= 0) {
+        setCursorIndex(restoredIndex);
+      }
+    }
+
+    setQuery("");
+    setSearchInput("");
+    setSearchMode(false);
+    setStatus("Search cleared.");
+  }, [tree, activeRow]);
 
   const moveCursor = useCallback(
     (delta: number): void => {
@@ -367,12 +385,8 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
     (input: string, key: Key) => {
       if (searchMode) {
         if (key.escape) {
-          pendingCursorNodeIdRef.current = activeRow?.id ?? null;
-          setQuery("");
-          setSearchInput("");
-          setSearchMode(false);
+          clearSearch();
           setShowHelp(false);
-          setStatus("Search cleared.");
           return;
         }
 
@@ -408,11 +422,7 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
       }
 
       if (key.escape && (query.length > 0 || searchInput.length > 0)) {
-        pendingCursorNodeIdRef.current = activeRow?.id ?? null;
-        setQuery("");
-        setSearchInput("");
-        setSearchMode(false);
-        setStatus("Search cleared.");
+        clearSearch();
         return;
       }
 
@@ -484,7 +494,7 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
       collapseAtCursor,
       expandAtCursor,
       showHelp,
-      activeRow,
+      clearSearch,
     ],
   );
 
@@ -533,95 +543,103 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
         width={stdoutWidth}
       >
         <Box
-          backgroundColor={COLORS.panelHelp}
+          backgroundColor={COLORS.panelMuted}
           flexBasis={sidebarWidth}
           flexDirection="column"
           flexGrow={0}
           flexShrink={0}
           height={mainHeight}
-          paddingX={1}
-          paddingY={0}
           width={sidebarWidth}
         >
-          <Box justifyContent="space-between">
-            <Text bold color={COLORS.accent}>
-              Skills
-            </Text>
-            <Text color={COLORS.muted}>{selectedSkills.length} selected</Text>
-          </Box>
-          <Text color={COLORS.panelHelp}> </Text>
-
-          <Box flexDirection="column">
-            {tree === null ? (
-              <Text color={COLORS.muted}>
-                {busy
-                  ? "Loading skill tree..."
-                  : "No skills available. Press r to retry or q to quit."}
+          <Box
+            backgroundColor={COLORS.panelHelp}
+            flexDirection="column"
+            flexGrow={1}
+            marginLeft={1}
+            marginY={1}
+            paddingY={0}
+          >
+            <Box backgroundColor={COLORS.panel} justifyContent="space-between" paddingX={1}>
+              <Text bold color={COLORS.accent}>
+                Skills
               </Text>
-            ) : visibleRows.length === 0 ? (
-              <Text color={COLORS.muted}>No matching skills.</Text>
-            ) : (
-              visibleListRows.map((row, rowIndex) => {
-                const actualRowIndex = listWindowStart + rowIndex;
-                const node = tree.nodes[row.id];
-                const isActive = actualRowIndex === cursorIndex;
-                const rowColor =
-                  node.kind === "group"
-                    ? COLORS.group
-                    : node.errorMessage
-                      ? COLORS.danger
-                      : COLORS.skill;
-                const activeBackground = getSelectionBackground(node);
-                const activeTextColor = node.errorMessage
-                  ? COLORS.danger
-                  : node.kind === "group"
-                    ? COLORS.group
-                    : COLORS.skill;
-                const mark = selectionMark(node.selection);
-                const indent = "  ".repeat(row.depth);
-                const icon = nodeIcon(node);
-                const skillLabel =
-                  node.kind === "skill" && node.skillMeta ? node.skillMeta.name : node.label;
-                const isSplitSkillRow = !isActive && node.kind === "skill";
-                const contentBackground = isActive
-                  ? activeBackground
-                  : node.kind === "skill"
-                    ? COLORS.panelMuted
-                    : COLORS.panelHelp;
-                const prefixBackground = isActive ? activeBackground : COLORS.panelHelp;
-                const checkboxColor = node.errorMessage ? COLORS.danger : rowColor;
+              <Text color={COLORS.muted}>{selectedSkills.length} selected</Text>
+            </Box>
 
-                return (
-                  <Box key={row.id}>
-                    <Box backgroundColor={prefixBackground} width={2}>
-                      <Text color={isActive ? activeTextColor : COLORS.muted}>
-                        {`${rowPrefix(isActive)} `}
-                      </Text>
+            <Box flexDirection="column" paddingX={1} paddingY={1}>
+              {tree === null ? (
+                <Text color={COLORS.muted}>
+                  {busy
+                    ? "Loading skill tree..."
+                    : "No skills available. Press r to retry or q to quit."}
+                </Text>
+              ) : visibleRows.length === 0 ? (
+                <Text color={COLORS.muted}>No matching skills.</Text>
+              ) : (
+                visibleListRows.map((row, rowIndex) => {
+                  const actualRowIndex = listWindowStart + rowIndex;
+                  const node = tree.nodes[row.id];
+                  const isActive = actualRowIndex === cursorIndex;
+                  const rowColor =
+                    node.kind === "group"
+                      ? COLORS.group
+                      : node.errorMessage
+                        ? COLORS.danger
+                        : COLORS.skill;
+                  const activeBackground = getSelectionBackground(node);
+                  const activeTextColor = node.errorMessage
+                    ? COLORS.danger
+                    : node.kind === "group"
+                      ? COLORS.group
+                      : COLORS.skill;
+                  const mark = selectionMark(node.selection);
+                  const indent = "  ".repeat(row.depth);
+                  const icon = nodeIcon(node);
+                  const skillLabel =
+                    node.kind === "skill" && node.skillMeta ? node.skillMeta.name : node.label;
+                  const isSplitSkillRow = !isActive && node.kind === "skill";
+                  const contentBackground = isActive
+                    ? activeBackground
+                    : node.kind === "skill"
+                      ? COLORS.panelMuted
+                      : COLORS.panelHelp;
+                  const prefixBackground = isActive ? activeBackground : COLORS.panelHelp;
+                  const checkboxColor = node.errorMessage ? COLORS.danger : rowColor;
+
+                  return (
+                    <Box key={row.id}>
+                      <Box backgroundColor={prefixBackground} width={2}>
+                        <Text color={isActive ? activeTextColor : COLORS.muted}>
+                          {`${rowPrefix(isActive)} `}
+                        </Text>
+                      </Box>
+                      <Box backgroundColor={contentBackground} flexGrow={1}>
+                        <Text color={isActive ? activeTextColor : COLORS.muted}>{indent}</Text>
+                        {node.kind === "group" ? (
+                          <Text
+                            color={isActive ? activeTextColor : COLORS.group}
+                          >{`${icon} `}</Text>
+                        ) : isSplitSkillRow ? (
+                          <Text color={COLORS.panelMuted}> </Text>
+                        ) : (
+                          <Text color={isActive ? activeTextColor : COLORS.muted}> </Text>
+                        )}
+                        <Text color={isActive ? activeTextColor : checkboxColor}>
+                          {node.errorMessage ? "[!] " : `${mark} `}
+                        </Text>
+                        <Text
+                          bold={node.kind === "group"}
+                          color={isActive ? activeTextColor : rowColor}
+                          wrap="truncate-end"
+                        >
+                          {skillLabel}
+                        </Text>
+                      </Box>
                     </Box>
-                    <Box backgroundColor={contentBackground} flexGrow={1}>
-                      <Text color={isActive ? activeTextColor : COLORS.muted}>{indent}</Text>
-                      {node.kind === "group" ? (
-                        <Text color={isActive ? activeTextColor : COLORS.group}>{`${icon} `}</Text>
-                      ) : isSplitSkillRow ? (
-                        <Text color={COLORS.panelMuted}> </Text>
-                      ) : (
-                        <Text color={isActive ? activeTextColor : COLORS.muted}> </Text>
-                      )}
-                      <Text color={isActive ? activeTextColor : checkboxColor}>
-                        {node.errorMessage ? "[!] " : `${mark} `}
-                      </Text>
-                      <Text
-                        bold={node.kind === "group"}
-                        color={isActive ? activeTextColor : rowColor}
-                        wrap="truncate-end"
-                      >
-                        {skillLabel}
-                      </Text>
-                    </Box>
-                  </Box>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </Box>
           </Box>
         </Box>
 
