@@ -3,11 +3,12 @@ import fuzzysort from "fuzzysort";
 import type { SkillNode, SkillTree } from "./types.js";
 
 function isMatchingSkill(node: SkillNode, query: string): boolean {
-  if (node.kind !== "skill" || !node.skillMeta) {
+  if (node.kind !== "skill") {
     return false;
   }
 
-  return fuzzysort.single(query, node.skillMeta.name) !== null;
+  const candidate = node.skillMeta?.name ?? node.label;
+  return fuzzysort.single(query, candidate) !== null;
 }
 
 export function filterTreeBySkillName(tree: SkillTree, query: string): Set<string> {

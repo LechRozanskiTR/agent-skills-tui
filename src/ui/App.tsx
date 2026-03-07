@@ -16,20 +16,24 @@ import { resolveSource, syncSource } from "../services/source.js";
 const SIDEBAR_WIDTH = 38;
 const COLORS = {
   shell: "#171925",
-  panel: "#23273a",
-  panelAlt: "#1c2033",
-  panelMuted: "#141827",
-  accent: "#f2cdcd",
+  panel: "#20263d",
+  panelMuted: "#101422",
+  panelHelp: "#171c2d",
+  accent: "#f3d38b",
   accentSoft: "#6c7086",
   text: "#c7cee5",
   muted: "#8890ad",
-  group: "#9b84b8",
-  skill: "#fff1d6",
+  footerText: "#8890ad",
+  footerAccent: "#f3d38b",
+  footerSeparator: "#6c7086",
+  group: "#89adcb",
+  skill: "#b8d0b0",
   success: "#a6da95",
-  warning: "#f7c7e8",
+  warning: "#f2cdcd",
   danger: "#ed8796",
-  selection: "#5b6078",
-  selectionText: "#ffffff",
+  selectionGroup: "#30465c",
+  selectionSkill: "#314337",
+  selectionError: "#4b2932",
 } as const;
 
 export interface AppExitResult {
@@ -97,15 +101,23 @@ function getStatusColor(status: string): string {
 }
 
 function ShortcutKey({ children }: { children: React.ReactNode }): React.JSX.Element {
-  return <Text color={COLORS.warning}>{children}</Text>;
+  return <Text color={COLORS.footerAccent}>{children}</Text>;
 }
 
 function ShortcutHint({ label, action }: { label: string; action: string }): React.JSX.Element {
   return (
-    <Text color={COLORS.muted}>
+    <Text color={COLORS.footerText}>
       <ShortcutKey>{label}</ShortcutKey> {action}
     </Text>
   );
+}
+
+function getSelectionBackground(node: SkillTree["nodes"][string]): string {
+  if (node.errorMessage) {
+    return COLORS.selectionError;
+  }
+
+  return node.kind === "group" ? COLORS.selectionGroup : COLORS.selectionSkill;
 }
 
 export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
@@ -193,7 +205,7 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
   const activeNode = tree && activeRow ? tree.nodes[activeRow.id] : undefined;
   const previewDescription =
     activeNode?.kind === "skill"
-      ? activeNode.skillMeta?.description || "(No description)"
+      ? activeNode.errorMessage || activeNode.skillMeta?.description || "(No description)"
       : "Move to a skill to preview its description.";
 
   const moveCursor = useCallback(
@@ -220,6 +232,34 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
       return;
     }
 
+    if (activeNode.kind !== "group") {
+      if (!activeNode.parentId) {
+        return;
+      }
+
+      const parentVisibleIndex = visibleRows.findIndex((row) => row.id === activeNode.parentId);
+      if (parentVisibleIndex >= 0) {
+        setCursorIndex(parentVisibleIndex);
+      }
+      return;
+    }
+
+    const siblingParentId = activeNode.parentId;
+    const siblingGroupIndexes = visibleRows
+      .map((row, index) => ({ row, index }))
+      .filter(({ row }) => {
+        const node = tree.nodes[row.id];
+        return node?.kind === "group" && node.parentId === siblingParentId;
+      });
+    const previousGroup = [...siblingGroupIndexes]
+      .reverse()
+      .find(({ index }) => index < cursorIndex);
+
+    if (previousGroup) {
+      setCursorIndex(previousGroup.index);
+      return;
+    }
+
     if (!activeNode.parentId) {
       return;
     }
@@ -228,10 +268,16 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
     if (parentVisibleIndex >= 0) {
       setCursorIndex(parentVisibleIndex);
     }
-  }, [tree, activeNode, visibleRows]);
+  }, [tree, activeNode, visibleRows, cursorIndex]);
 
   const expandAtCursor = useCallback((): void => {
-    if (!tree || !activeNode || activeNode.kind !== "group") {
+    if (!tree || !activeNode) {
+      moveCursor(1);
+      return;
+    }
+
+    if (activeNode.kind !== "group") {
+      moveCursor(1);
       return;
     }
 
@@ -248,7 +294,7 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
     if (childIndex >= 0) {
       setCursorIndex(childIndex);
     }
-  }, [tree, activeNode, visibleNodeIds, query]);
+  }, [tree, activeNode, visibleNodeIds, query, moveCursor]);
 
   const toggleAtCursor = useCallback((): void => {
     if (!tree || !activeNode) {
@@ -440,7 +486,7 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
         width={stdoutWidth}
       >
         <Box
-          backgroundColor={COLORS.panelAlt}
+          backgroundColor={COLORS.panelHelp}
           flexBasis={sidebarWidth}
           flexDirection="column"
           flexGrow={0}
@@ -456,6 +502,7 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
             </Text>
             <Text color={COLORS.muted}>{selectedSkills.length} selected</Text>
           </Box>
+          <Text color={COLORS.panelHelp}> </Text>
 
           <Box flexDirection="column">
             {tree === null ? (
@@ -471,33 +518,59 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
                 const actualRowIndex = listWindowStart + rowIndex;
                 const node = tree.nodes[row.id];
                 const isActive = actualRowIndex === cursorIndex;
-                const rowColor = node?.kind === "group" ? COLORS.group : COLORS.skill;
+                const rowColor =
+                  node.kind === "group"
+                    ? COLORS.group
+                    : node.errorMessage
+                      ? COLORS.danger
+                      : COLORS.skill;
+                const activeBackground = getSelectionBackground(node);
+                const activeTextColor = node.errorMessage
+                  ? COLORS.danger
+                  : node.kind === "group"
+                    ? COLORS.group
+                    : COLORS.skill;
                 const mark = selectionMark(node.selection);
                 const indent = "  ".repeat(row.depth);
                 const icon = nodeIcon(node);
                 const skillLabel =
                   node.kind === "skill" && node.skillMeta ? node.skillMeta.name : node.label;
+                const isSplitSkillRow = !isActive && node.kind === "skill";
+                const contentBackground = isActive
+                  ? activeBackground
+                  : node.kind === "skill"
+                    ? COLORS.panelMuted
+                    : COLORS.panelHelp;
+                const prefixBackground = isActive ? activeBackground : COLORS.panelHelp;
+                const checkboxColor = node.errorMessage ? COLORS.danger : rowColor;
 
                 return (
-                  <Box key={row.id} backgroundColor={isActive ? COLORS.selection : COLORS.panelAlt}>
-                    <Text
-                      color={isActive ? COLORS.selectionText : COLORS.muted}
-                    >{`${rowPrefix(isActive)} ${indent}`}</Text>
-                    {node.kind === "group" ? (
+                  <Box key={row.id}>
+                    <Box backgroundColor={prefixBackground} width={2}>
+                      <Text color={isActive ? activeTextColor : COLORS.muted}>
+                        {`${rowPrefix(isActive)} `}
+                      </Text>
+                    </Box>
+                    <Box backgroundColor={contentBackground} flexGrow={1}>
+                      <Text color={isActive ? activeTextColor : COLORS.muted}>{indent}</Text>
+                      {node.kind === "group" ? (
+                        <Text color={isActive ? activeTextColor : COLORS.group}>{`${icon} `}</Text>
+                      ) : isSplitSkillRow ? (
+                        <Text color={COLORS.panelMuted}> </Text>
+                      ) : (
+                        <Text color={isActive ? activeTextColor : COLORS.muted}> </Text>
+                      )}
+                      <Text color={isActive ? activeTextColor : checkboxColor}>
+                        {node.errorMessage ? "[!] " : `${mark} `}
+                      </Text>
                       <Text
-                        color={isActive ? COLORS.selectionText : COLORS.group}
-                      >{`${icon} `}</Text>
-                    ) : (
-                      <Text color={isActive ? COLORS.selectionText : COLORS.muted}> </Text>
-                    )}
-                    <Text color={COLORS.muted}>{`${mark} `}</Text>
-                    <Text
-                      bold={node.kind === "skill"}
-                      color={isActive ? COLORS.selectionText : rowColor}
-                      wrap="truncate-end"
-                    >
-                      {skillLabel}
-                    </Text>
+                        bold={node.kind === "group"}
+                        color={isActive ? activeTextColor : rowColor}
+                        wrap="truncate-end"
+                      >
+                        {skillLabel}
+                      </Text>
+                    </Box>
                   </Box>
                 );
               })
@@ -510,26 +583,51 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
             backgroundColor={COLORS.panelMuted}
             flexDirection="column"
             flexGrow={1}
+            justifyContent="space-between"
             paddingX={1}
             paddingY={0}
           >
-            <Text bold color={COLORS.warning}>
-              Description
-            </Text>
-            <Text color={COLORS.text}>{previewBody}</Text>
+            <Box flexDirection="column">
+              <Text bold color={COLORS.accent}>
+                Description
+              </Text>
+              <Text color={COLORS.text}>{previewBody}</Text>
+            </Box>
             {showHelp ? (
-              <Box flexDirection="column">
-                <Text bold color={COLORS.warning}>
-                  Keyboard Shortcuts
-                </Text>
-                <ShortcutHint label="up/down" action="move cursor" />
-                <ShortcutHint label="left/right" action="collapse or expand groups" />
-                <ShortcutHint label="space" action="toggle selection" />
-                <ShortcutHint label="f" action="open search" />
-                <ShortcutHint label="r" action="refresh source" />
-                <ShortcutHint label="enter" action="install selected skills" />
-                <ShortcutHint label="q" action="quit" />
-                <ShortcutHint label="?" action="toggle shortcuts" />
+              <Box
+                backgroundColor={COLORS.panelHelp}
+                flexDirection="column"
+                marginX={1}
+                paddingX={1}
+                paddingY={0}
+                marginBottom={1}
+              >
+                <Box
+                  backgroundColor={COLORS.panel}
+                  justifyContent="center"
+                  marginX={-1}
+                  paddingX={1}
+                >
+                  <Text bold color={COLORS.accent}>
+                    Keyboard Shortcuts
+                  </Text>
+                </Box>
+                <Box flexDirection="row" justifyContent="space-between">
+                  <ShortcutHint label="up/down" action="move cursor" />
+                  <ShortcutHint label="space" action="toggle" />
+                </Box>
+                <Box flexDirection="row" justifyContent="space-between">
+                  <ShortcutHint label="left/right" action="collapse/expand" />
+                  <ShortcutHint label="f" action="search" />
+                </Box>
+                <Box flexDirection="row" justifyContent="space-between">
+                  <ShortcutHint label="r" action="refresh" />
+                  <ShortcutHint label="enter" action="install" />
+                </Box>
+                <Box flexDirection="row" justifyContent="space-between">
+                  <ShortcutHint label="q" action="quit" />
+                  <ShortcutHint label="?" action="toggle shortcuts" />
+                </Box>
               </Box>
             ) : null}
           </Box>
@@ -538,7 +636,7 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
 
       {searchMode ? (
         <Box backgroundColor={COLORS.panel} paddingX={1} paddingY={0}>
-          <Text color={COLORS.muted}>
+          <Text color={COLORS.footerText}>
             Search: {searchInput}| <ShortcutKey>enter</ShortcutKey> apply ·{" "}
             <ShortcutKey>esc</ShortcutKey> clear
           </Text>
@@ -548,15 +646,15 @@ export function App({ sourceArg, targetCwd }: AppProps): React.JSX.Element {
       <Box backgroundColor={COLORS.panel} justifyContent="space-between" paddingX={1} paddingY={0}>
         <Box flexDirection="row">
           <ShortcutHint label="space" action="toggle" />
-          <Text color={COLORS.muted}> · </Text>
+          <Text color={COLORS.footerSeparator}> · </Text>
           <ShortcutHint label="f" action="search" />
-          <Text color={COLORS.muted}> · </Text>
+          <Text color={COLORS.footerSeparator}> · </Text>
           <ShortcutHint label="r" action="refresh" />
-          <Text color={COLORS.muted}> · </Text>
+          <Text color={COLORS.footerSeparator}> · </Text>
           <ShortcutHint label="enter" action="install" />
-          <Text color={COLORS.muted}> · </Text>
+          <Text color={COLORS.footerSeparator}> · </Text>
           <ShortcutHint label="q" action="quit" />
-          <Text color={COLORS.muted}> · </Text>
+          <Text color={COLORS.footerSeparator}> · </Text>
           <ShortcutHint label="?" action="shortcuts" />
         </Box>
         <Text color={query ? COLORS.warning : getStatusColor(status)}>

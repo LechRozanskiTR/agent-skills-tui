@@ -21,7 +21,7 @@ function getDescendantSkillIds(nodeId: string, nodes: Record<string, SkillNode>)
   }
 
   if (node.kind === "skill") {
-    return [node.id];
+    return node.skillMeta ? [node.id] : [];
   }
 
   const skills: string[] = [];
@@ -49,12 +49,15 @@ function recomputeSelectionFrom(
   }
 
   if (node.kind === "skill") {
-    return node.selection;
+    return node.skillMeta ? node.selection : "unchecked";
   }
 
-  const childSelections = node.childIds.map((childId) =>
-    recomputeSelectionFrom(childId, nodes, visited),
-  );
+  const childSelections = node.childIds
+    .filter((childId) => {
+      const childNode = nodes[childId];
+      return childNode?.kind !== "skill" || Boolean(childNode.skillMeta);
+    })
+    .map((childId) => recomputeSelectionFrom(childId, nodes, visited));
 
   if (childSelections.length === 0) {
     node.selection = "unchecked";
@@ -83,7 +86,7 @@ export function toggleSelection(
   const nextNodes = cloneNodes(tree.nodes);
   const node = nextNodes[nodeId];
 
-  if (!node) {
+  if (!node || (node.kind === "skill" && !node.skillMeta)) {
     return tree;
   }
 
@@ -123,7 +126,22 @@ export function setExpanded(tree: SkillTree, nodeId: string, expanded: boolean):
   }
 
   const nextNodes = cloneNodes(tree.nodes);
-  nextNodes[nodeId].expanded = expanded;
+  const updateExpanded = (currentNodeId: string): void => {
+    const currentNode = nextNodes[currentNodeId];
+    if (!currentNode || currentNode.kind !== "group") {
+      return;
+    }
+
+    currentNode.expanded = expanded;
+
+    if (!expanded) {
+      for (const childId of currentNode.childIds) {
+        updateExpanded(childId);
+      }
+    }
+  };
+
+  updateExpanded(nodeId);
 
   return {
     ...tree,

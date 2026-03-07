@@ -47,14 +47,15 @@ async function buildNodeTree(
   };
 
   if (hasSkillFile) {
-    let skillMeta: SkillMeta;
+    let skillMeta: SkillMeta | undefined;
+    let errorMessage: string | undefined;
 
     try {
       skillMeta = await parseSkillMeta(path.join(absDirPath, SKILL_FILE_NAME));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       context.warnings.push(message);
-      return null;
+      errorMessage = message;
     }
 
     const nodeId = absDirPath;
@@ -70,6 +71,7 @@ async function buildNodeTree(
       expanded: false,
       selection: "unchecked",
       skillMeta,
+      errorMessage,
       symlinkMeta,
     };
 

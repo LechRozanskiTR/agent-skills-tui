@@ -45,6 +45,9 @@ describe("discoverSkills", () => {
     expect(collectSkillNames(tree)).toEqual([]);
     expect(tree.warnings).toHaveLength(1);
     expect(tree.warnings[0]).toContain('missing required frontmatter field "name"');
+    const malformedNode = Object.values(tree.nodes).find((node) => node.label === "bad-skill");
+    expect(malformedNode?.kind).toBe("skill");
+    expect(malformedNode?.errorMessage).toContain('missing required frontmatter field "name"');
   });
 
   it("keeps valid skills visible when siblings are malformed", async () => {
@@ -55,5 +58,10 @@ describe("discoverSkills", () => {
     expect(collectSkillNames(tree)).toEqual(["good-skill"]);
     expect(tree.warnings).toHaveLength(1);
     expect(tree.warnings[0]).toContain("/testdata/mixed-malformed-skills/bad-skill/SKILL.md");
+    const malformedNode = Object.values(tree.nodes).find((node) => node.label === "bad-skill");
+    expect(malformedNode?.kind).toBe("skill");
+    expect(malformedNode?.errorMessage).toContain(
+      "/testdata/mixed-malformed-skills/bad-skill/SKILL.md",
+    );
   });
 });

@@ -23,6 +23,7 @@ export interface SkillNode {
   expanded: boolean;
   selection: SelectionState;
   skillMeta?: SkillMeta;
+  errorMessage?: string;
   symlinkMeta?: SymlinkMeta;
 }
 
