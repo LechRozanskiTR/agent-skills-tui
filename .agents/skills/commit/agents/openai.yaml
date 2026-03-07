@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit"
+  short_description: "Stage all and create a commit"
+  default_prompt: "Use $commit to stage everything and create a conventional commit."
