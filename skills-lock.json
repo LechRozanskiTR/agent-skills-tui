@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "markdown-lint": {
+      "source": "/home/lech/dev/ai/skills",
+      "sourceType": "local",
+      "computedHash": "a3be8ab2a484b6cfc4b78b4477a6f01e90209380962284d4763da2da2802fe8e"
+    }
+  }
+}

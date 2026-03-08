@@ -254,6 +254,11 @@ function AppContent({ sourceArg, targetCwd }: AppProps) {
   });
 
   const selectedCount = useMemo(() => selectedSkills.length, [selectedSkills]);
+  let searchBar: React.ReactNode = null;
+
+  if (searchMode) {
+    searchBar = <SearchBar searchInput={searchInput} />;
+  }
 
   return (
     <AppLayout
@@ -270,7 +275,7 @@ function AppContent({ sourceArg, targetCwd }: AppProps) {
         />
       }
       mainHeight={mainHeight}
-      searchBar={searchMode ? <SearchBar searchInput={searchInput} /> : null}
+      searchBar={searchBar}
       shortcuts={<ShortcutsPanel showHelp={showHelp} />}
       sidebar={
         <SkillTreePanel

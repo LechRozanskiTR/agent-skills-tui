@@ -52,7 +52,6 @@ export function AppLayout({
         >
           {sidebar}
         </Box>
-
         <Box
           backgroundColor={theme.colors.panelRightMuted}
           flexDirection="column"
@@ -66,7 +65,6 @@ export function AppLayout({
           {shortcuts}
         </Box>
       </Box>
-
       {searchBar}
       {footer}
     </Box>

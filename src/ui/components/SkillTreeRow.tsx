@@ -1,4 +1,5 @@
 import { Box, Text } from "ink";
+import type { ReactNode } from "react";
 
 import type { SkillNode, VisibleNode } from "../../domain/types.js";
 import { useTheme } from "../theme/ThemeProvider.js";
@@ -17,55 +18,66 @@ interface SkillTreeRowProps {
 
 export function SkillTreeRow({ row, node, isActive }: SkillTreeRowProps) {
   const theme = useTheme();
-  const rowColor =
-    node.kind === "group"
-      ? theme.colors.group
-      : node.errorMessage
-        ? theme.colors.danger
-        : theme.colors.skill;
+  let rowColor = theme.colors.skill;
+
+  if (node.kind === "group") {
+    rowColor = theme.colors.group;
+  } else if (node.errorMessage) {
+    rowColor = theme.colors.danger;
+  }
   const activeBackground = getSelectionBackground(theme, node);
-  const activeTextColor = node.errorMessage
-    ? theme.colors.danger
-    : node.kind === "group"
-      ? theme.colors.group
-      : theme.colors.skill;
+  let activeTextColor = theme.colors.skill;
+
+  if (node.errorMessage) {
+    activeTextColor = theme.colors.danger;
+  } else if (node.kind === "group") {
+    activeTextColor = theme.colors.group;
+  }
   const mark = selectionMark(node.selection);
   const indent = "  ".repeat(row.depth);
   const icon = nodeIcon(node);
-  const skillLabel = node.kind === "skill" && node.skillMeta ? node.skillMeta.name : node.label;
+  let skillLabel = node.label;
+
+  if (node.kind === "skill" && node.skillMeta) {
+    skillLabel = node.skillMeta.name;
+  }
   const isSplitSkillRow = !isActive && node.kind === "skill";
-  const contentBackground = isActive
-    ? activeBackground
-    : node.kind === "skill"
-      ? theme.colors.panelMuted
-      : theme.colors.panelHelp;
+  let contentBackground = activeBackground;
+
+  if (!isActive) {
+    contentBackground = node.kind === "skill" ? theme.colors.panelMuted : theme.colors.panelHelp;
+  }
   const prefixBackground = isActive ? activeBackground : theme.colors.panelHelp;
   const checkboxColor = node.errorMessage ? theme.colors.danger : rowColor;
+  const defaultTextColor = isActive ? activeTextColor : theme.colors.muted;
+  const groupIconColor = isActive ? activeTextColor : theme.colors.group;
+  const checkboxTextColor = isActive ? activeTextColor : checkboxColor;
+  const labelTextColor = isActive ? activeTextColor : rowColor;
+  let selectionText = `${mark} `;
+
+  if (node.errorMessage) {
+    selectionText = "[!] ";
+  }
+  let iconContent: ReactNode;
+
+  if (node.kind === "group") {
+    iconContent = <Text color={groupIconColor}>{`${icon} `}</Text>;
+  } else if (isSplitSkillRow) {
+    iconContent = <Text color={theme.colors.panelMuted}> </Text>;
+  } else {
+    iconContent = <Text color={defaultTextColor}> </Text>;
+  }
 
   return (
     <Box>
       <Box backgroundColor={prefixBackground} width={2}>
-        <Text
-          color={isActive ? activeTextColor : theme.colors.muted}
-        >{`${rowPrefix(isActive)} `}</Text>
+        <Text color={defaultTextColor}>{`${rowPrefix(isActive)} `}</Text>
       </Box>
       <Box backgroundColor={contentBackground} flexGrow={1}>
-        <Text color={isActive ? activeTextColor : theme.colors.muted}>{indent}</Text>
-        {node.kind === "group" ? (
-          <Text color={isActive ? activeTextColor : theme.colors.group}>{`${icon} `}</Text>
-        ) : isSplitSkillRow ? (
-          <Text color={theme.colors.panelMuted}> </Text>
-        ) : (
-          <Text color={isActive ? activeTextColor : theme.colors.muted}> </Text>
-        )}
-        <Text color={isActive ? activeTextColor : checkboxColor}>
-          {node.errorMessage ? "[!] " : `${mark} `}
-        </Text>
-        <Text
-          bold={node.kind === "group"}
-          color={isActive ? activeTextColor : rowColor}
-          wrap="truncate-end"
-        >
+        <Text color={defaultTextColor}>{indent}</Text>
+        {iconContent}
+        <Text color={checkboxTextColor}>{selectionText}</Text>
+        <Text bold={node.kind === "group"} color={labelTextColor} wrap="truncate-end">
           {skillLabel}
         </Text>
       </Box>

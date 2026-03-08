@@ -33,8 +33,11 @@ export function useSkillTreeState({
 
   const loadTree = useCallback(
     async (mode: LoadMode) => {
+      const isInitialLoad = mode === "initial";
+      const refreshVerb = isInitialLoad ? "Loading" : "Refreshing";
+
       setBusy(true);
-      setStatus(mode === "initial" ? "Loading source..." : "Refreshing source...");
+      setStatus(`${refreshVerb} source...`);
 
       try {
         const resolved = await resolveSource(sourceArg, targetCwd);
@@ -44,11 +47,11 @@ export function useSkillTreeState({
         setTree(discovered);
         setActiveSourceArg(resolved.originalSourceArg);
         if (discovered.warnings.length > 0) {
-          setStatus(
-            `${mode === "initial" ? "Source loaded" : "Source refreshed"} with ${discovered.warnings.length} warning${discovered.warnings.length === 1 ? "" : "s"}.`,
-          );
+          const resultVerb = isInitialLoad ? "Source loaded" : "Source refreshed";
+          const warningSuffix = discovered.warnings.length === 1 ? "" : "s";
+          setStatus(`${resultVerb} with ${discovered.warnings.length} warning${warningSuffix}.`);
         } else {
-          setStatus(mode === "initial" ? "Source loaded." : "Source refreshed.");
+          setStatus(isInitialLoad ? "Source loaded." : "Source refreshed.");
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

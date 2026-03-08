@@ -24,7 +24,7 @@ export function Panel({
   flexGrow,
   flexShrink,
   overflow,
-  bodyPaddingX = variant === "primary" ? 1 : 0,
+  bodyPaddingX,
   bodyPaddingY = 1,
 }: PanelProps) {
   const theme = useTheme();
@@ -32,6 +32,12 @@ export function Panel({
   const headerJustify = rightText ? "space-between" : "center";
   const containerPaddingX = variant === "secondary" ? 1 : 0;
   const headerMarginX = variant === "secondary" ? -1 : 0;
+  const resolvedBodyPaddingX = bodyPaddingX ?? (variant === "primary" ? 1 : 0);
+  let rightTextContent = rightText;
+
+  if (typeof rightText === "string" || typeof rightText === "number") {
+    rightTextContent = <Text color={theme.colors.muted}>{rightText}</Text>;
+  }
 
   return (
     <Box
@@ -52,13 +58,9 @@ export function Panel({
         <Text bold color={theme.colors.accent}>
           {title}
         </Text>
-        {typeof rightText === "string" || typeof rightText === "number" ? (
-          <Text color={theme.colors.muted}>{rightText}</Text>
-        ) : (
-          rightText
-        )}
+        {rightTextContent}
       </Box>
-      <Box flexDirection="column" paddingX={bodyPaddingX} paddingY={bodyPaddingY}>
+      <Box flexDirection="column" paddingX={resolvedBodyPaddingX} paddingY={bodyPaddingY}>
         {children}
       </Box>
     </Box>
