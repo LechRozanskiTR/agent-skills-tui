@@ -5,6 +5,8 @@ import path from "node:path";
 
 import { execa } from "execa";
 
+import { logErrorToStdout } from "../utils/logging.js";
+
 export type SourceKind = "local" | "remote";
 
 export interface ResolvedSource {
@@ -99,7 +101,8 @@ export async function resolveSource(sourceArg: string, cwd: string): Promise<Res
 async function ensureGitInstalled(): Promise<void> {
   try {
     await execa("git", ["--version"]);
-  } catch {
+  } catch (error) {
+    logErrorToStdout(error, "Failed to verify git availability:");
     throw new Error("git is required for remote sources but was not found in PATH.");
   }
 }
@@ -125,6 +128,10 @@ export async function syncSource(
   try {
     await execa("git", ["clone", "--depth", "1", source.remoteCloneUrl, source.tempCheckoutPath]);
   } catch (error) {
+    logErrorToStdout(
+      error,
+      `Failed to clone remote source "${source.originalSourceArg}" into ${source.tempCheckoutPath}:`,
+    );
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to clone remote source "${source.originalSourceArg}": ${message}`);
   }

@@ -1,9 +1,23 @@
+import { mkdtemp, mkdir, symlink, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { SkillTree } from "../domain/types.js";
 import { discoverSkills } from "./discovery.js";
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirs.splice(0).map(async (tempDir) => {
+      await import("node:fs/promises").then(({ rm }) =>
+        rm(tempDir, { recursive: true, force: true }),
+      );
+    }),
+  );
+});
 
 function collectSkillNames(tree: SkillTree): string[] {
   return Object.values(tree.nodes)
@@ -62,6 +76,46 @@ describe("discoverSkills", () => {
     expect(malformedNode?.kind).toBe("skill");
     expect(malformedNode?.errorMessage).toContain(
       "/testdata/mixed-malformed-skills/bad-skill/SKILL.md",
+    );
+  });
+
+  it("ignores symlinked files while traversing directories", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "agent-skills-tui-discovery-"));
+    tempDirs.push(tempDir);
+
+    const skillDir = path.join(tempDir, "skill-one");
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(
+      path.join(skillDir, "SKILL.md"),
+      "---\nname: skill-one\ndescription: Example\n---\n# Skill One\n",
+    );
+    await writeFile(path.join(tempDir, "CLAUDE-source.md"), "# Claude\n");
+    await symlink(path.join(tempDir, "CLAUDE-source.md"), path.join(tempDir, "CLAUDE.md"));
+
+    const tree = await discoverSkills(tempDir);
+
+    expect(collectSkillNames(tree)).toEqual(["skill-one"]);
+    expect(tree.warnings).toEqual([]);
+  });
+
+  it("skips cyclic symlink directories instead of recursing forever", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "agent-skills-tui-discovery-"));
+    tempDirs.push(tempDir);
+
+    const platformDir = path.join(tempDir, "platform");
+    const skillDir = path.join(platformDir, "perf-skill");
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(
+      path.join(skillDir, "SKILL.md"),
+      "---\nname: perf-skill\ndescription: Example\n---\n# Perf Skill\n",
+    );
+    await symlink(tempDir, path.join(platformDir, "loop"));
+
+    const tree = await discoverSkills(tempDir);
+
+    expect(collectSkillNames(tree)).toEqual(["perf-skill"]);
+    expect(tree.warnings).toContain(
+      `Skipped cyclic symlink directory: ${path.join(platformDir, "loop")} -> ${tempDir}`,
     );
   });
 });

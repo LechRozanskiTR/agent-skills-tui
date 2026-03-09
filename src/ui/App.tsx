@@ -243,6 +243,7 @@ function AppContent({ sourceArg, targetCwd }: AppProps) {
       void loadTree("refresh");
     },
     moveCursor,
+    pageJumpSize: Math.max(1, visibleListRows.length),
     confirmInstall,
     toggleAtCursor,
     collapseAtCursor,

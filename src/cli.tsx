@@ -1,9 +1,68 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { render } from "ink";
+import { render, type Instance } from "ink";
 
 import { runInstall } from "./services/install.js";
 import { App, type AppExitResult } from "./ui/App.js";
+import {
+  beginBufferedStdoutLogs,
+  discardBufferedStdoutLogs,
+  flushBufferedStdoutLogs,
+  logErrorToStdout,
+} from "./utils/logging.js";
+
+let activeAppInstance: Instance | null = null;
+let usingAlternateScreen = false;
+
+function writeTerminalEscape(sequence: string): void {
+  if (!process.stdout.isTTY) {
+    return;
+  }
+
+  process.stdout.write(sequence);
+}
+
+function enterAlternateScreen(): void {
+  if (usingAlternateScreen || !process.stdout.isTTY) {
+    return;
+  }
+
+  usingAlternateScreen = true;
+  writeTerminalEscape("\u001B[?1049h");
+}
+
+function exitAlternateScreen(): void {
+  if (!usingAlternateScreen || !process.stdout.isTTY) {
+    return;
+  }
+
+  writeTerminalEscape("\u001B[?1049l");
+  usingAlternateScreen = false;
+}
+
+function clearRenderedApp(): void {
+  activeAppInstance?.clear();
+  activeAppInstance?.cleanup();
+  activeAppInstance = null;
+}
+
+function registerFatalErrorHandlers(): void {
+  process.on("uncaughtException", (error) => {
+    clearRenderedApp();
+    exitAlternateScreen();
+    flushBufferedStdoutLogs();
+    logErrorToStdout(error, "Uncaught exception:");
+    process.exitCode = 1;
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    clearRenderedApp();
+    exitAlternateScreen();
+    flushBufferedStdoutLogs();
+    logErrorToStdout(reason, "Unhandled rejection:");
+    process.exitCode = 1;
+  });
+}
 
 async function runCli(): Promise<void> {
   const program = new Command();
@@ -17,8 +76,13 @@ async function runCli(): Promise<void> {
   const sourceArg = program.args[0];
   const targetCwd = process.cwd();
 
-  console.clear();
-  const appInstance = render(<App sourceArg={sourceArg} targetCwd={targetCwd} />);
+  enterAlternateScreen();
+  beginBufferedStdoutLogs();
+  const appInstance = render(<App sourceArg={sourceArg} targetCwd={targetCwd} />, {
+    stdout: process.stdout,
+    stderr: process.stdout,
+  });
+  activeAppInstance = appInstance;
   const handleResize = (): void => {
     appInstance.rerender(<App sourceArg={sourceArg} targetCwd={targetCwd} />);
   };
@@ -30,6 +94,9 @@ async function runCli(): Promise<void> {
     waitResult = await appInstance.waitUntilExit();
   } finally {
     process.stdout.off("resize", handleResize);
+    clearRenderedApp();
+    exitAlternateScreen();
+    flushBufferedStdoutLogs();
   }
 
   const result = isAppExitResult(waitResult) ? waitResult : { kind: "quit" as const };
@@ -45,8 +112,7 @@ async function runCli(): Promise<void> {
       cwd: targetCwd,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(message);
+    logErrorToStdout(error, "Skill installation failed:");
     process.exitCode = 1;
   }
 }
@@ -60,8 +126,12 @@ function isAppExitResult(value: unknown): value is AppExitResult {
   );
 }
 
+registerFatalErrorHandlers();
+
 void runCli().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(message);
+  clearRenderedApp();
+  exitAlternateScreen();
+  flushBufferedStdoutLogs();
+  logErrorToStdout(error, "CLI run failed:");
   process.exitCode = 1;
 });

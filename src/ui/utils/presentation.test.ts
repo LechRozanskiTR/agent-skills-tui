@@ -35,8 +35,8 @@ describe("presentation utils", () => {
   });
 
   it("chooses group icons", () => {
-    expect(nodeIcon(createNode({ kind: "group", expanded: true }))).toBe("");
-    expect(nodeIcon(createNode({ kind: "group", expanded: false }))).toBe("");
+    expect(nodeIcon(createNode({ kind: "group", expanded: true }))).toBe("-");
+    expect(nodeIcon(createNode({ kind: "group", expanded: false }))).toBe("+");
     expect(nodeIcon(createNode({ kind: "skill" }))).toBe("");
   });
 

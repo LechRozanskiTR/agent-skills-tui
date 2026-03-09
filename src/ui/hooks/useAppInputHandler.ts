@@ -18,6 +18,7 @@ interface UseAppInputHandlerParams {
   quit: () => void;
   refresh: () => void;
   moveCursor: (delta: number) => void;
+  pageJumpSize: number;
   confirmInstall: () => void;
   toggleAtCursor: () => void;
   collapseAtCursor: () => void;
@@ -45,6 +46,7 @@ interface GlobalShortcutActions {
 
 interface TreeNavigationActions {
   moveCursor: (delta: number) => void;
+  pageJumpSize: number;
   confirmInstall: () => void;
   toggleAtCursor: () => void;
   collapseAtCursor: () => void;
@@ -133,7 +135,7 @@ function handleGlobalShortcuts(
   return false;
 }
 
-function handleTreeNavigationInput(
+export function handleTreeNavigationInput(
   input: string,
   key: Key,
   actions: TreeNavigationActions,
@@ -145,6 +147,16 @@ function handleTreeNavigationInput(
 
   if (key.downArrow) {
     actions.moveCursor(1);
+    return true;
+  }
+
+  if (key.pageUp) {
+    actions.moveCursor(-actions.pageJumpSize);
+    return true;
+  }
+
+  if (key.pageDown) {
+    actions.moveCursor(actions.pageJumpSize);
     return true;
   }
 
@@ -188,6 +200,7 @@ export function useAppInputHandler({
   quit,
   refresh,
   moveCursor,
+  pageJumpSize,
   confirmInstall,
   toggleAtCursor,
   collapseAtCursor,
@@ -230,6 +243,7 @@ export function useAppInputHandler({
 
       handleTreeNavigationInput(input, key, {
         moveCursor,
+        pageJumpSize,
         confirmInstall,
         toggleAtCursor,
         collapseAtCursor,
@@ -253,6 +267,7 @@ export function useAppInputHandler({
       quit,
       refresh,
       moveCursor,
+      pageJumpSize,
       confirmInstall,
       toggleAtCursor,
       collapseAtCursor,

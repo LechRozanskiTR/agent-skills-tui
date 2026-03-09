@@ -1,9 +1,10 @@
-import { lstat, readdir, readFile, realpath } from "node:fs/promises";
+import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 import matter from "gray-matter";
 
 import type { SkillMeta, SkillNode, SkillTree } from "../domain/types.js";
+import { logErrorToStdout } from "../utils/logging.js";
 
 const SKILL_FILE_NAME = "SKILL.md";
 const ROOT_ID = "__root__";
@@ -30,8 +31,25 @@ async function parseSkillMeta(skillFilePath: string): Promise<SkillMeta> {
 }
 
 interface BuildContext {
+  activeCanonicalPaths: Set<string>;
   nodes: Record<string, SkillNode>;
   warnings: string[];
+}
+
+async function resolveDirectoryMetadata(absPath: string): Promise<{
+  canonicalPath: string;
+  isDirectory: boolean;
+  isSymlink: boolean;
+}> {
+  const lstatResult = await lstat(absPath);
+  const canonicalPath = await realpath(absPath);
+  const statResult = lstatResult.isSymbolicLink() ? await stat(absPath) : lstatResult;
+
+  return {
+    canonicalPath,
+    isDirectory: statResult.isDirectory(),
+    isSymlink: lstatResult.isSymbolicLink(),
+  };
 }
 
 async function buildNodeTree(
@@ -39,101 +57,135 @@ async function buildNodeTree(
   parentId: string | null,
   context: BuildContext,
 ): Promise<string | null> {
-  const dirEntries = await readdir(absDirPath, { withFileTypes: true });
-  dirEntries.sort((a, b) => a.name.localeCompare(b.name));
+  const { canonicalPath, isDirectory, isSymlink } = await resolveDirectoryMetadata(absDirPath);
 
-  const hasSkillFile = dirEntries.some((entry) => entry.isFile() && entry.name === SKILL_FILE_NAME);
-  const lstatResult = await lstat(absDirPath);
-  const canonicalPath = await realpath(absDirPath);
+  if (!isDirectory) {
+    return null;
+  }
+
+  if (context.activeCanonicalPaths.has(canonicalPath)) {
+    context.warnings.push(`Skipped cyclic symlink directory: ${absDirPath} -> ${canonicalPath}`);
+    return null;
+  }
+
+  context.activeCanonicalPaths.add(canonicalPath);
+
+  try {
+    const dirEntries = await readdir(absDirPath, { withFileTypes: true });
+    dirEntries.sort((a, b) => a.name.localeCompare(b.name));
+
+    const hasSkillFile = dirEntries.some(
+      (entry) => entry.name === SKILL_FILE_NAME && (entry.isFile() || entry.isSymbolicLink()),
+    );
   const symlinkMeta = {
-    isSymlink: lstatResult.isSymbolicLink(),
+    isSymlink,
     realPath: canonicalPath,
   };
 
-  if (hasSkillFile) {
-    let skillMeta: SkillMeta | undefined;
-    let errorMessage: string | undefined;
+    if (hasSkillFile) {
+      let skillMeta: SkillMeta | undefined;
+      let errorMessage: string | undefined;
 
-    try {
-      skillMeta = await parseSkillMeta(path.join(absDirPath, SKILL_FILE_NAME));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      context.warnings.push(message);
-      errorMessage = message;
+      try {
+        skillMeta = await parseSkillMeta(path.join(absDirPath, SKILL_FILE_NAME));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        context.warnings.push(message);
+        errorMessage = message;
+        logErrorToStdout(error, { includeStack: false });
+      }
+
+      const nodeId = absDirPath;
+
+      context.nodes[nodeId] = {
+        id: nodeId,
+        kind: "skill",
+        label: path.basename(absDirPath),
+        absPath: absDirPath,
+        canonicalPath,
+        parentId,
+        childIds: [],
+        expanded: false,
+        selection: "unchecked",
+        skillMeta,
+        errorMessage,
+        symlinkMeta,
+      };
+
+      return nodeId;
+    }
+
+    const childIds: string[] = [];
+
+    for (const entry of dirEntries) {
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) {
+        continue;
+      }
+
+      const childAbsPath = path.join(absDirPath, entry.name);
+
+      if (entry.isSymbolicLink()) {
+        try {
+          const childStat = await stat(childAbsPath);
+          if (!childStat.isDirectory()) {
+            continue;
+          }
+        } catch (error) {
+          const message = `Skipped unreadable symlink: ${childAbsPath}`;
+          context.warnings.push(message);
+          logErrorToStdout(error, { context: message, includeStack: false });
+          continue;
+        }
+      }
+
+      const maybeNodeId = await buildNodeTree(childAbsPath, absDirPath, context);
+      if (maybeNodeId) {
+        childIds.push(maybeNodeId);
+      }
+    }
+
+    if (childIds.length === 0) {
+      return null;
     }
 
     const nodeId = absDirPath;
-
     context.nodes[nodeId] = {
       id: nodeId,
-      kind: "skill",
+      kind: "group",
       label: path.basename(absDirPath),
       absPath: absDirPath,
       canonicalPath,
       parentId,
-      childIds: [],
-      expanded: false,
+      childIds,
+      expanded: true,
       selection: "unchecked",
-      skillMeta,
-      errorMessage,
       symlinkMeta,
     };
 
+    for (const childId of childIds) {
+      const child = context.nodes[childId];
+      if (child) {
+        child.parentId = nodeId;
+      }
+    }
+
     return nodeId;
+  } finally {
+    context.activeCanonicalPaths.delete(canonicalPath);
   }
-
-  const childIds: string[] = [];
-
-  for (const entry of dirEntries) {
-    if (!entry.isDirectory() && !entry.isSymbolicLink()) {
-      continue;
-    }
-
-    const childAbsPath = path.join(absDirPath, entry.name);
-    const childStat = await lstat(childAbsPath);
-    if (!childStat.isDirectory() && !childStat.isSymbolicLink()) {
-      continue;
-    }
-
-    const maybeNodeId = await buildNodeTree(childAbsPath, absDirPath, context);
-    if (maybeNodeId) {
-      childIds.push(maybeNodeId);
-    }
-  }
-
-  if (childIds.length === 0) {
-    return null;
-  }
-
-  const nodeId = absDirPath;
-  context.nodes[nodeId] = {
-    id: nodeId,
-    kind: "group",
-    label: path.basename(absDirPath),
-    absPath: absDirPath,
-    canonicalPath,
-    parentId,
-    childIds,
-    expanded: true,
-    selection: "unchecked",
-    symlinkMeta,
-  };
-
-  for (const childId of childIds) {
-    const child = context.nodes[childId];
-    if (child) {
-      child.parentId = nodeId;
-    }
-  }
-
-  return nodeId;
 }
 
 export async function discoverSkills(rootPath: string): Promise<SkillTree> {
   const absoluteRootPath = path.resolve(rootPath);
-  const context: BuildContext = { nodes: {}, warnings: [] };
+  const context: BuildContext = { activeCanonicalPaths: new Set(), nodes: {}, warnings: [] };
+  let discoveredRoot: string | null;
 
-  const discoveredRoot = await buildNodeTree(absoluteRootPath, ROOT_ID, context);
+  try {
+    discoveredRoot = await buildNodeTree(absoluteRootPath, ROOT_ID, context);
+  } catch (error) {
+    logErrorToStdout(error, `Failed to build skill tree for ${absoluteRootPath}:`);
+    throw error;
+  }
   if (!discoveredRoot) {
     if (context.warnings.length === 0) {
       throw new Error(`No skills found under source path: ${absoluteRootPath}`);

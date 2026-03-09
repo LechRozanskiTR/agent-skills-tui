@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { SkillTree } from "../../domain/types.js";
 import { discoverSkills } from "../../services/discovery.js";
 import { resolveSource, syncSource } from "../../services/source.js";
+import { logErrorToStdout } from "../../utils/logging.js";
 
 type LoadMode = "initial" | "refresh";
 
@@ -55,6 +56,7 @@ export function useSkillTreeState({
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        logErrorToStdout(error, `${refreshVerb} source failed:`);
         setStatus(message);
         setTree((currentTree) => currentTree);
       } finally {

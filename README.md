@@ -27,6 +27,7 @@ pnpm dev -- https://github.com/owner/repo.git
 ## Keybindings
 
 - `up` / `down`: move
+- `pgup` / `pgdn`: jump by one visible page
 - `left` / `h`: collapse
 - `right` / `l`: expand
 - `space`: toggle selection
