@@ -193,6 +193,34 @@ describe("setExpanded", () => {
     expect(updated.nodes.g1.expanded).toBe(true);
     expect(updated.nodes.g2.expanded).toBe(false);
   });
+
+  it("reuses untouched nodes when expanding a folder", () => {
+    let tree = buildTree();
+    tree = setExpanded(tree, "g1", false);
+    const originalRoot = tree.nodes.root;
+    const originalNestedGroup = tree.nodes.g2;
+    const originalSkill = tree.nodes.s2;
+
+    const updated = setExpanded(tree, "g1", true);
+
+    expect(updated.nodes.root).toBe(originalRoot);
+    expect(updated.nodes.g2).toBe(originalNestedGroup);
+    expect(updated.nodes.s2).toBe(originalSkill);
+    expect(updated.nodes.g1).not.toBe(tree.nodes.g1);
+  });
+
+  it("reuses unaffected siblings when collapsing a folder", () => {
+    const tree = buildTree();
+    const originalRoot = tree.nodes.root;
+    const originalSiblingSkill = tree.nodes.s2;
+
+    const updated = setExpanded(tree, "g1", false);
+
+    expect(updated.nodes.root).toBe(originalRoot);
+    expect(updated.nodes.s2).toBe(originalSiblingSkill);
+    expect(updated.nodes.g1).not.toBe(tree.nodes.g1);
+    expect(updated.nodes.g2).not.toBe(tree.nodes.g2);
+  });
 });
 
 describe("setAllExpanded", () => {

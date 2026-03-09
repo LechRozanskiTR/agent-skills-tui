@@ -13,6 +13,13 @@ function cloneNodes(nodes: Record<string, SkillNode>): Record<string, SkillNode>
   return cloned;
 }
 
+function cloneNode(node: SkillNode): SkillNode {
+  return {
+    ...node,
+    childIds: [...node.childIds],
+  };
+}
+
 function getDescendantSkillIds(nodeId: string, nodes: Record<string, SkillNode>): string[] {
   const node = nodes[nodeId];
 
@@ -125,14 +132,22 @@ export function setExpanded(tree: SkillTree, nodeId: string, expanded: boolean):
     return tree;
   }
 
-  const nextNodes = cloneNodes(tree.nodes);
+  const nextNodes = {
+    ...tree.nodes,
+  };
+  let changed = false;
+
   const updateExpanded = (currentNodeId: string): void => {
-    const currentNode = nextNodes[currentNodeId];
-    if (!currentNode || currentNode.kind !== "group") {
+    const currentNode = nextNodes[currentNodeId] ?? tree.nodes[currentNodeId];
+    if (!currentNode || currentNode.kind !== "group" || currentNode.expanded === expanded) {
       return;
     }
 
-    currentNode.expanded = expanded;
+    nextNodes[currentNodeId] = {
+      ...cloneNode(currentNode),
+      expanded,
+    };
+    changed = true;
 
     if (!expanded) {
       for (const childId of currentNode.childIds) {
@@ -143,6 +158,9 @@ export function setExpanded(tree: SkillTree, nodeId: string, expanded: boolean):
 
   updateExpanded(nodeId);
 
+  if (!changed) {
+    return tree;
+  }
   return {
     ...tree,
     nodes: nextNodes,
