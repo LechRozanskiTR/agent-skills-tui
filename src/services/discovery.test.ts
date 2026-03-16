@@ -43,6 +43,18 @@ describe("discoverSkills", () => {
     ]);
   });
 
+  it("uses the frontmatter name even when the folder name differs", async () => {
+    const tree = await discoverSkills(
+      path.resolve(process.cwd(), "testdata/mismatched-skill-name"),
+    );
+
+    expect(collectSkillNames(tree)).toEqual(["actual-skill-name"]);
+    const skillNode = Object.values(tree.nodes).find((node) => node.kind === "skill");
+
+    expect(skillNode?.label).toBe("alias-folder");
+    expect(skillNode?.skillMeta?.name).toBe("actual-skill-name");
+  });
+
   it("stops traversal once a SKILL.md boundary is found", async () => {
     const tree = await discoverSkills(
       path.resolve(process.cwd(), "testdata/local-skill-boundaries"),
@@ -121,7 +133,9 @@ describe("discoverSkills", () => {
     );
 
     const tree = await discoverSkills(tempDir);
-    const rootChildLabels = tree.nodes[tree.rootId]?.childIds.map((childId) => tree.nodes[childId]?.label);
+    const rootChildLabels = tree.nodes[tree.rootId]?.childIds.map(
+      (childId) => tree.nodes[childId]?.label,
+    );
 
     expect(rootChildLabels).toEqual(["godot", "commit", "markdown-lint"]);
   });

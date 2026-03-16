@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildInstallCommand } from "./install.js";
 
 describe("buildInstallCommand", () => {
-  it("creates a single npx skills add invocation with deduped skill names", () => {
+  it("creates a single non-interactive npx skills add invocation with deduped skill names", () => {
     const command = buildInstallCommand({
       originalSourceArg: "openai/skills",
       selectedSkillNames: ["a", "b", "a"],
@@ -12,9 +12,11 @@ describe("buildInstallCommand", () => {
 
     expect(command.cmd).toBe("npx");
     expect(command.args).toEqual([
+      "-y",
       "skills",
       "add",
       "openai/skills",
+      "--full-depth",
       "--skill",
       "a",
       "--skill",

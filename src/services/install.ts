@@ -15,7 +15,7 @@ export interface BuiltCommand {
 export function buildInstallCommand(params: InstallParams): BuiltCommand {
   const { originalSourceArg, selectedSkillNames, cwd } = params;
   const uniqueSkillNames = [...new Set(selectedSkillNames)];
-  const args = ["skills", "add", originalSourceArg];
+  const args = ["-y", "skills", "add", originalSourceArg, "--full-depth"];
 
   for (const skillName of uniqueSkillNames) {
     args.push("--skill", skillName);
