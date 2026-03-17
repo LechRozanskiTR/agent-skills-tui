@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "tsx src/cli.tsx",
     "build": "tsup src/cli.tsx --format esm --dts --clean",
+    "build:release": "node scripts/build-release.mjs",
     "start": "node dist/cli.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

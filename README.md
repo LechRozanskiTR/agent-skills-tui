@@ -2,26 +2,82 @@
 
 Terminal UI for browsing and installing skills from a local or remote source repository.
 
-## Requirements
+## Install
+
+This tool is distributed through GitHub Releases instead of an npm registry.
+
+### macOS and Linux
+
+Requirements:
+
+- Node.js 20+
+- `git` for remote sources
+- `npx` for the install handoff
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LechRozanskiTR/agent-skills-tui/main/scripts/install.sh | sh
+```
+
+The installer downloads the latest `agent-skills-tui.tar.gz` release asset, installs it to
+`~/.local/share/agent-skills-tui`, and links `agent-skills-tui` into `~/.local/bin`.
+
+### Windows
+
+Requirements:
+
+- Node.js 20+
+- `git` for remote sources
+- `npx` for the install handoff
+
+```powershell
+irm https://raw.githubusercontent.com/LechRozanskiTR/agent-skills-tui/main/scripts/install.ps1 | iex
+```
+
+The PowerShell installer downloads the latest `agent-skills-tui-windows.zip` release asset,
+installs it to `%LOCALAPPDATA%\agent-skills-tui`, and creates wrappers in `%USERPROFILE%\.local\bin`.
+
+### Manual install
+
+If you prefer not to use the installer scripts, download the latest release assets from:
+
+- <https://github.com/LechRozanskiTR/agent-skills-tui/releases/latest>
+
+Use `agent-skills-tui.tar.gz` on macOS/Linux and `agent-skills-tui-windows.zip` on Windows.
+After extracting, put the bundled `bin` command on your `PATH`.
+
+### Upgrades
+
+Re-run the relevant installer command to replace an existing installation with the latest release.
+
+To install a specific release instead of the latest one:
+
+- macOS/Linux: set `AGENT_SKILLS_TUI_VERSION=vX.Y.Z` before running `install.sh`
+- Windows: pass `-Version vX.Y.Z` to `install.ps1`
+
+## Development Requirements
 
 - Node.js 20+
 - pnpm
-- `git` (for remote sources)
-- `npx` (for install handoff)
 
 ## Usage
 
 ```bash
-pnpm install
-pnpm dev -- <source>
+agent-skills-tui <source>
 ```
 
 Examples:
 
 ```bash
-pnpm dev -- ./path/to/skills-repo
-pnpm dev -- owner/repo
-pnpm dev -- https://github.com/owner/repo.git
+agent-skills-tui ./path/to/skills-repo
+agent-skills-tui owner/repo
+agent-skills-tui https://github.com/owner/repo.git
+```
+
+For local development:
+
+```bash
+pnpm install
+pnpm dev -- <source>
 ```
 
 ## Keybindings
@@ -44,4 +100,5 @@ pnpm dev -- https://github.com/owner/repo.git
 pnpm typecheck
 pnpm test
 pnpm check
+pnpm build:release
 ```
