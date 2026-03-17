@@ -5,6 +5,8 @@ Terminal UI for browsing and installing skills from a local or remote source rep
 ## Install
 
 This tool is distributed through GitHub Releases instead of an npm registry.
+The installer scripts are fetched from the `master` branch and install the latest release asset
+by default.
 
 ### macOS and Linux
 
@@ -15,7 +17,7 @@ Requirements:
 - `npx` for the install handoff
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/LechRozanskiTR/agent-skills-tui/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/LechRozanskiTR/agent-skills-tui/master/scripts/install.sh | sh
 ```
 
 The installer downloads the latest `agent-skills-tui.tar.gz` release asset, installs it to
@@ -30,7 +32,7 @@ Requirements:
 - `npx` for the install handoff
 
 ```powershell
-irm https://raw.githubusercontent.com/LechRozanskiTR/agent-skills-tui/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/LechRozanskiTR/agent-skills-tui/master/scripts/install.ps1 | iex
 ```
 
 The PowerShell installer downloads the latest `agent-skills-tui-windows.zip` release asset,
@@ -53,6 +55,18 @@ To install a specific release instead of the latest one:
 
 - macOS/Linux: set `AGENT_SKILLS_TUI_VERSION=vX.Y.Z` before running `install.sh`
 - Windows: pass `-Version vX.Y.Z` to `install.ps1`
+
+Example version-pinned installs:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LechRozanskiTR/agent-skills-tui/master/scripts/install.sh | AGENT_SKILLS_TUI_VERSION=vX.Y.Z sh
+```
+
+```powershell
+$scriptPath = Join-Path $env:TEMP "agent-skills-tui-install.ps1"
+irm https://raw.githubusercontent.com/LechRozanskiTR/agent-skills-tui/master/scripts/install.ps1 -OutFile $scriptPath
+& $scriptPath -Version vX.Y.Z
+```
 
 ## Development Requirements
 
