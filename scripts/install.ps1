@@ -52,7 +52,7 @@ try {
 
   New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 
-  $cmdTarget = Join-Path $InstallDir "bin\agent-skills-tui.js"
+  $cmdTarget = Join-Path $InstallDir "dist\cli.js"
   $cmdWrapperPath = Join-Path $BinDir "agent-skills-tui.cmd"
   $ps1WrapperPath = Join-Path $BinDir "agent-skills-tui.ps1"
 

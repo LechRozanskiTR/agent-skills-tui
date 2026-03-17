@@ -17,11 +17,12 @@ import { fileURLToPath } from "node:url";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 const packageJsonPath = join(repoRoot, "package.json");
+const lockfilePath = join(repoRoot, "pnpm-lock.yaml");
 const releaseDir = join(repoRoot, "release");
 const stagingDir = join(repoRoot, ".release-staging");
+const runtimeTemplateDir = join(stagingDir, "runtime-template");
 const unixAppDir = join(stagingDir, "agent-skills-tui");
 const windowsAppDir = join(stagingDir, "agent-skills-tui-windows");
-const distCliPath = join(repoRoot, "dist", "cli.js");
 const unixAssetName = "agent-skills-tui.tar.gz";
 const windowsAssetName = "agent-skills-tui-windows.zip";
 const checksumsName = "checksums.txt";
@@ -46,22 +47,84 @@ function commandName(base) {
   return base;
 }
 
-function writeWindowsLauncher(targetDir) {
-  const cmdPath = join(targetDir, "agent-skills-tui.cmd");
-  const ps1Path = join(targetDir, "agent-skills-tui.ps1");
-  const jsPath = join(targetDir, "agent-skills-tui.js");
+function createReleasePackageJson(sourcePackageJson) {
+  return {
+    name: sourcePackageJson.name,
+    version: sourcePackageJson.version,
+    description: sourcePackageJson.description,
+    type: "module",
+    private: true,
+    bin: {
+      "agent-skills-tui": "dist/cli.js",
+    },
+    engines: sourcePackageJson.engines,
+  };
+}
 
-  cpSync(distCliPath, jsPath);
+function prepareRuntimeTemplate(targetDir) {
+  mkdirSync(join(targetDir, "dist"), { recursive: true });
+  cpSync(packageJsonPath, join(targetDir, "package.json"));
+  cpSync(lockfilePath, join(targetDir, "pnpm-lock.yaml"));
+  cpSync(join(repoRoot, "dist", "cli.js"), join(targetDir, "dist", "cli.js"));
+  run(
+    commandName("pnpm"),
+    ["install", "--prod", "--frozen-lockfile", "--config.node-linker=hoisted"],
+    targetDir,
+  );
+}
 
+function copyRuntimeFiles(sourceDir, targetDir, version, sourcePackageJson) {
+  const distDir = join(sourceDir, "dist");
+  const nodeModulesDir = join(sourceDir, "node_modules");
+
+  if (!existsSync(distDir)) {
+    throw new Error(`Expected deployed dist directory at ${distDir}`);
+  }
+
+  if (!existsSync(nodeModulesDir)) {
+    throw new Error(`Expected deployed node_modules directory at ${nodeModulesDir}`);
+  }
+
+  mkdirSync(targetDir, { recursive: true });
+  cpSync(distDir, join(targetDir, "dist"), { recursive: true });
+  cpSync(nodeModulesDir, join(targetDir, "node_modules"), { recursive: true });
+  cpSync(join(repoRoot, "README.md"), join(targetDir, "README.md"));
+  cpSync(join(repoRoot, "LICENSE"), join(targetDir, "LICENSE"));
+  writeFileSync(
+    join(targetDir, "package.json"),
+    `${JSON.stringify(createReleasePackageJson(sourcePackageJson), null, 2)}\n`,
+  );
+  writeFileSync(join(targetDir, "VERSION"), `${version}\n`);
+}
+
+function writeUnixLauncher(appDir) {
+  const binDir = join(appDir, "bin");
+  const launcherPath = join(binDir, "agent-skills-tui");
+
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(
+    launcherPath,
+    [
+      "#!/usr/bin/env sh",
+      'SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"',
+      'exec node "$SCRIPT_DIR/../dist/cli.js" "$@"',
+      "",
+    ].join("\n"),
+  );
+  chmodSync(launcherPath, 0o755);
+}
+
+function writeWindowsLauncher(appDir) {
+  const binDir = join(appDir, "bin");
+  const cmdPath = join(binDir, "agent-skills-tui.cmd");
+  const ps1Path = join(binDir, "agent-skills-tui.ps1");
+
+  mkdirSync(binDir, { recursive: true });
   writeFileSync(
     cmdPath,
-    [
-      "@echo off",
-      "setlocal",
-      'node "%~dp0agent-skills-tui.js" %*',
-      "exit /b %ERRORLEVEL%",
-      "",
-    ].join("\r\n"),
+    ["@echo off", "setlocal", 'node "%~dp0..\\dist\\cli.js" %*', "exit /b %ERRORLEVEL%", ""].join(
+      "\r\n",
+    ),
   );
 
   writeFileSync(
@@ -73,7 +136,7 @@ function writeWindowsLauncher(targetDir) {
       ")",
       "",
       "$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path",
-      '& node (Join-Path $scriptDir "agent-skills-tui.js") @Arguments',
+      '& node (Join-Path $scriptDir "..\\dist\\cli.js") @Arguments',
       "exit $LASTEXITCODE",
       "",
     ].join("\r\n"),
@@ -94,28 +157,13 @@ function main() {
   rmSync(stagingDir, { recursive: true, force: true });
 
   mkdirSync(releaseDir, { recursive: true });
-  mkdirSync(join(unixAppDir, "bin"), { recursive: true });
-  mkdirSync(join(windowsAppDir, "bin"), { recursive: true });
-
   run(commandName("pnpm"), ["build"]);
+  prepareRuntimeTemplate(runtimeTemplateDir);
 
-  if (!existsSync(distCliPath)) {
-    throw new Error(`Expected bundled CLI at ${distCliPath}`);
-  }
-
-  const unixBinaryPath = join(unixAppDir, "bin", "agent-skills-tui");
-  cpSync(distCliPath, unixBinaryPath);
-  chmodSync(unixBinaryPath, 0o755);
-
-  writeWindowsLauncher(join(windowsAppDir, "bin"));
-
-  cpSync(join(repoRoot, "README.md"), join(unixAppDir, "README.md"));
-  cpSync(join(repoRoot, "LICENSE"), join(unixAppDir, "LICENSE"));
-  cpSync(join(repoRoot, "README.md"), join(windowsAppDir, "README.md"));
-  cpSync(join(repoRoot, "LICENSE"), join(windowsAppDir, "LICENSE"));
-
-  writeFileSync(join(unixAppDir, "VERSION"), `${version}\n`);
-  writeFileSync(join(windowsAppDir, "VERSION"), `${version}\n`);
+  copyRuntimeFiles(runtimeTemplateDir, unixAppDir, version, packageJson);
+  copyRuntimeFiles(runtimeTemplateDir, windowsAppDir, version, packageJson);
+  writeUnixLauncher(unixAppDir);
+  writeWindowsLauncher(windowsAppDir);
 
   run("tar", ["-czf", join(releaseDir, unixAssetName), basename(unixAppDir)], stagingDir);
 
