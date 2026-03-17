@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-
 import type { Key } from "ink";
+import { describe, expect, it, vi } from "vitest";
 
 import { handleTreeNavigationInput } from "./useAppInputHandler.js";
 

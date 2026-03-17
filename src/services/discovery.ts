@@ -110,10 +110,10 @@ async function buildNodeTree(
     const hasSkillFile = dirEntries.some(
       (entry) => entry.name === SKILL_FILE_NAME && (entry.isFile() || entry.isSymbolicLink()),
     );
-  const symlinkMeta = {
-    isSymlink,
-    realPath: canonicalPath,
-  };
+    const symlinkMeta = {
+      isSymlink,
+      realPath: canonicalPath,
+    };
 
     if (hasSkillFile) {
       let skillMeta: SkillMeta | undefined;

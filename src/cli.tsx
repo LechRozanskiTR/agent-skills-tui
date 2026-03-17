@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { render, type Instance } from "ink";
+import { type Instance, render } from "ink";
 
 import { runInstall } from "./services/install.js";
 import { App, type AppExitResult } from "./ui/App.js";

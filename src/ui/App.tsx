@@ -2,7 +2,12 @@ import { useApp, useInput, useStdout } from "ink";
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 
 import { filterTreeBySkillName } from "../domain/search.js";
-import { flattenVisibleTree, setAllExpanded, setExpanded, toggleSelection } from "../domain/tree.js";
+import {
+  flattenVisibleTree,
+  setAllExpanded,
+  setExpanded,
+  toggleSelection,
+} from "../domain/tree.js";
 import { AppLayout } from "./components/AppLayout.js";
 import { DetailsPanel } from "./components/DetailsPanel.js";
 import { SearchBar } from "./components/SearchBar.js";
@@ -224,7 +229,11 @@ function AppContent({ sourceArg, targetCwd }: AppProps) {
     const nextVisibleNodeIds = filterTreeBySkillName(nextTree, query);
     const nextForcedExpandedNodeIds =
       query.trim().length > 0 ? new Set(forcedExpandedNodeIds).add(activeNode.id) : undefined;
-    const nextVisibleRows = flattenVisibleTree(nextTree, nextVisibleNodeIds, nextForcedExpandedNodeIds);
+    const nextVisibleRows = flattenVisibleTree(
+      nextTree,
+      nextVisibleNodeIds,
+      nextForcedExpandedNodeIds,
+    );
     const childIndex = nextVisibleRows.findIndex((row) => row.id === firstChildId);
 
     if (childIndex >= 0) {

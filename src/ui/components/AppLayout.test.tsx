@@ -44,7 +44,10 @@ describe("AppLayout", () => {
     const visibleRows = flattenVisibleTree(tree, visibleNodeIds);
     const cursorIndex = visibleRows.findIndex((row) => {
       const node = tree.nodes[row.id];
-      return node?.kind === "skill" && node.skillMeta?.name === "enterprise-content-authoring-workflow-optimization";
+      return (
+        node?.kind === "skill" &&
+        node.skillMeta?.name === "enterprise-content-authoring-workflow-optimization"
+      );
     });
 
     expect(cursorIndex).toBeGreaterThanOrEqual(0);

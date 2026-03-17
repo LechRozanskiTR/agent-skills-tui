@@ -94,7 +94,11 @@ export function useVisibleSkillRows({
       const nextVisibleNodeIds = nextSearchResults.visibleNodeIds;
       const nextForcedExpandedNodeIds =
         nextQuery.trim().length > 0 ? nextSearchResults.autoExpandedGroupIds : undefined;
-      const nextVisibleRows = flattenVisibleTree(tree, nextVisibleNodeIds, nextForcedExpandedNodeIds);
+      const nextVisibleRows = flattenVisibleTree(
+        tree,
+        nextVisibleNodeIds,
+        nextForcedExpandedNodeIds,
+      );
       return nextVisibleRows.findIndex((row) => row.id === nodeId);
     },
     [tree],

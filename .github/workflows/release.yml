@@ -32,11 +32,11 @@ jobs:
       - name: Run typecheck
         run: pnpm typecheck
 
-      - name: Run tests
-        run: pnpm test
-
       - name: Run Biome checks
         run: pnpm check
+
+      - name: Run tests
+        run: pnpm test
 
       - name: Build release artifacts
         run: pnpm build:release

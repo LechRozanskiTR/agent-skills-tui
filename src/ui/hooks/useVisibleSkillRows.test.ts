@@ -8,8 +8,9 @@ describe("resolveForcedExpandedNodeIds", () => {
   });
 
   it("uses auto-expanded search groups by default", () => {
-    expect([...resolveForcedExpandedNodeIds("plat", new Set(["root", "platform"])) ?? []].sort())
-      .toEqual(["platform", "root"]);
+    expect(
+      [...(resolveForcedExpandedNodeIds("plat", new Set(["root", "platform"])) ?? [])].sort(),
+    ).toEqual(["platform", "root"]);
   });
 
   it("allows collapsed overrides to suppress auto-expanded groups", () => {
@@ -18,7 +19,7 @@ describe("resolveForcedExpandedNodeIds", () => {
       expandedGroupIds: new Set(),
     });
 
-    expect([...resolved ?? []]).toEqual([]);
+    expect([...(resolved ?? [])]).toEqual([]);
   });
 
   it("allows explicit expanded overrides to restore groups", () => {
@@ -27,6 +28,6 @@ describe("resolveForcedExpandedNodeIds", () => {
       expandedGroupIds: new Set(["platform"]),
     });
 
-    expect([...resolved ?? []]).toEqual(["platform"]);
+    expect([...(resolved ?? [])]).toEqual(["platform"]);
   });
 });
